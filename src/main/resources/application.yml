@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: solips_project
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/soplis?serverTimezone=UTC&useSSL=false
+    username: root
+    password: whitekid07
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update     # 스키마 자동 업데이트
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+# ✅ JwtUtil.java 에 맞춘 JWT 설정
+jwt:
+  secret: "myVerySecretKeyThatIsAtLeast256BitsLong12345678901234567890"
+  access-token-expiration: 1800000       # 30분 (1000 * 60 * 30)
+  refresh-token-expiration: 1209600000   # 14일 (1000 * 60 * 60 * 24 * 14)
+
+# ✅ 로깅 설정
+logging:
+  level:
+    com.solips.users.security: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ✅ 회원가입 / 인증 관련 추가 옵션 (있으면 유지 가능)
+app:
+  auth:
+    password:
+      bcrypt-strength: 12
+
+    signup:
+      allowed-domains:
+        - gsm.hs.kr
+      email-pattern: "^s\\d{5}@gsm\\.hs\\.kr$"
+      email-pattern-message: "GSM 이메일 형식(s00000@gsm.hs.kr)만 허용됩니다."
+      min-password-length: 8
+      require-email-verification: false
+      student-id:
+        extract-from-email: true
+        pattern: "s(\\d{5})"
