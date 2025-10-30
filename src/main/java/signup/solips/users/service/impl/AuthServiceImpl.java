@@ -7,6 +7,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import signup.solips.global.config.JwtUtil;
+import signup.solips.global.exception.CustomException;
+import signup.solips.global.exception.ErrorCode;
 import signup.solips.users.dto.request.UserLoginRequestDto;
 import signup.solips.users.dto.request.UserSignupRequestDto;
 import signup.solips.users.dto.response.TokenResponse;
@@ -44,14 +46,25 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     @Override
+
+    /**
+     * 회원가입 처리
+     *
+     * <p>이메일과 사용자 아이디 중복을 체크하고, 비밀번호를 암호화한 후 사용자 정보를 DB에 저장합니다.
+     *
+     * @param request 회원가입 요청 DTO
+     * @return 생성된 사용자 정보(UserInfo)
+     * @throws CustomException 이메일 또는 아이디가 이미 존재할 경우 발생
+     */
+
     public UserInfo signup(UserSignupRequestDto request) throws IllegalAccessException {
         log.info("회원가입 시도: userId={}, email={}", request.getUserId(), request.getEmail());
 
         if(userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new IllegalAccessException("이미 사용중인 이메일입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
         if(userRepository.findByUserId(request.getUserId()).isPresent()) {
-            throw new IllegalAccessException("이미 사용 중인 아이디입니다.");
+            throw new CustomException(ErrorCode.DUPLICATE_USER_ID);
         }
 
         String password = passwordEncoder.encode(request.getPassword());
@@ -73,14 +86,24 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    /**
+     * 로그인 처리
+     *
+     * <p>사용자 아이디와 비밀번호를 검증하고, 유효하면 액세스 토큰과 리프레시 토큰을 발급합니다.
+     *
+     * @param request 로그인 요청 DTO
+     * @return 로그인 응답 DTO(UserLoginResponseDto) - 액세스 토큰, 리프레시 토큰, 사용자 정보 포함
+     * @throws CustomException 아이디 또는 비밀번호가 잘못된 경우 발생
+     */
+
     @Override
     @Transactional
     public UserLoginResponseDto login(UserLoginRequestDto request) {
         UserEntity user = userRepository.findByUserId(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 잘못되었습니다"));
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 잘못되었습니다");  // ✅
+            throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         String accessToken = jwtUtil.generateAcessToken(user.getUserId());
@@ -107,25 +130,43 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    /**
+     * 로그아웃 처리
+     *
+     * <p>사용자의 리프레시 토큰을 DB에서 삭제하여 로그아웃 처리합니다.
+     *
+     * @param userId 로그아웃할 사용자 아이디
+     */
+
     @Override
     public void logout(String userId) {
         userRepository.clearRefreshToken(userId);
     }
 
+    /**
+     * 리프레시 토큰을 이용한 액세스 토큰 갱신
+     *
+     * <p>리프레시 토큰의 유효성 및 만료를 확인하고, 새로운 액세스 토큰을 발급합니다.
+     *
+     * @param refreshToken 클라이언트가 제공한 리프레시 토큰
+     * @return 새로운 액세스 토큰 정보(TokenResponse)
+     * @throws CustomException 리프레시 토큰이 유효하지 않거나 만료된 경우 발생
+     */
+
     @Override
-    public TokenResponse refreshToken(String refreshToken) throws IllegalAccessException {
+    public TokenResponse refreshToken(String refreshToken) throws CustomException {
         if (!jwtUtil.validateToken(refreshToken)) {
             try {
-                throw new IllegalAccessException("유효하지않은 리프레시 토큰입니다.");
-            } catch (IllegalAccessException e) {
+                throw new CustomException(ErrorCode.INVALID_TOKEN);
+            } catch (CustomException e) {
                 throw new RuntimeException(e);
             }
         }
         UserEntity user  = userRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new IllegalArgumentException("유효하지않은 토큰입니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_REFRESH_TOKEN));
 
         if (user.getRefreshTokenExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalAccessException("만료된 토큰입니다.");
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
         }
 
         String newAccessToken = jwtUtil.generateAcessToken(user.getUserId());
@@ -136,6 +177,15 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtUtil.getAccessTokenExpiration()/1000)
                 .build();
     }
+
+    /**
+     * 사용자 아이디 중복 확인
+     *
+     * <p>사용자가 입력한 아이디가 이미 존재하는지 확인합니다.
+     *
+     * @param userId 확인할 사용자 아이디
+     * @return 사용 가능한 아이디이면 true, 이미 존재하면 false
+     */
 
     @Override
     @Transactional(readOnly = true)
