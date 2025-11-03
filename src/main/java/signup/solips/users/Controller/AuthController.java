@@ -91,8 +91,5 @@ public class AuthController {
     }
 }
 // 중복 체크 응답 Record
-record CheckAvailabilityResponse(
-        boolean available,
-        String message
-) {}
+
 
