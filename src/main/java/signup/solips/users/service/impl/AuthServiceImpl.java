@@ -177,19 +177,5 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtUtil.getAccessTokenExpiration()/1000)
                 .build();
     }
-
-    /**
-     * 사용자 아이디 중복 확인
-     *
-     * <p>사용자가 입력한 아이디가 이미 존재하는지 확인합니다.
-     *
-     * @param userId 확인할 사용자 아이디
-     * @return 사용 가능한 아이디이면 true, 이미 존재하면 false
-     */
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean isUserIdAvailable(String userId) {
-        return !userRepository.findByUserId(userId).isPresent();
-    }
 }
+
