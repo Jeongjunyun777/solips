@@ -37,7 +37,5 @@ public interface AuthService {
     // 토큰 갱신
     TokenResponse refreshToken(String refreshToken) throws IllegalAccessException;
 
-    // 아이디 중복 체크
-    boolean isUserIdAvailable(String userId);
 }
 
